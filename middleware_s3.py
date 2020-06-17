@@ -100,7 +100,7 @@ class PreSignedUrlBuilder:
             self.PAYLOAD_HASH
         )
 
-        std_request = "\n".join(request_values)
+        std_request = "\n".join(std_request_values)
 
         # Build String-to-Sign
         sts_values = (
