@@ -17,12 +17,11 @@ import datetime
 import hashlib
 import hmac
 
-# backwards compatibility for python2
-try:
+try:  # Python3
+    from urllib.parse import (urlencode, urlparse)
+except ImportError:  # Python2
     from urlparse import urlparse
-except ImportError:
-    from urllib.parse import urlparse
-    from urllib.parse import quote
+    from urllib import urlencode
 
 from Foundation import CFPreferencesCopyAppValue
 
@@ -53,8 +52,10 @@ class PreSignedUrlBuilder:
         self.secret_key = self.pref('S3SecretKey')
         self.region = self.pref('S3Region')
 
-        self.host = self.host_from_url(self.url)
-        self.resource = self.uri_from_url(self.url)
+        parsed_url = urlparse(self.url)
+
+        self.host = parsed_url.hostname
+        self.resource = parsed_url.path
 
     def __str__(self):
         """
@@ -78,30 +79,38 @@ class PreSignedUrlBuilder:
                                                     self.SERVICE)
 
         cred = "{}/{}".format(self.access_key, cred_scope)
-        encoded_cred = quote(cred, safe="")
 
-        std_qs = ("X-Amz-Algorithm={}"
-                  "&X-Amz-Credential={}"
-                  "&X-Amz-Date={}"
-                  "&X-Amz-Expires={}"
-                  "&X-Amz-SignedHeaders={}").format(self.ALGORITHM,
-                                                    encoded_cred,
-                                                    timestamp,
-                                                    str(expires),
-                                                    self.SIGNED_HEADERS)
+        qs_values = [
+            ('X-Amz-Algorithm', self.ALGORITHM),
+            ('X-Amz-Credential', cred),
+            ('X-Amz-Date', timestamp),
+            ('X-Amz-Expires', expires),
+            ('X-Amz-SignedHeaders', self.SIGNED_HEADERS)
+        ]
+
+        std_qs = urlencode(qs_values)
 
         # Build Request
-        std_request = "GET\n{}\n{}\n{}\n{}\n{}".format(self.resource,
-                                                       std_qs,
-                                                       std_headers,
-                                                       self.SIGNED_HEADERS,
-                                                       self.PAYLOAD_HASH)
+        std_request_values = (
+            'GET',
+            self.resource,
+            std_qs,
+            std_headers,
+            self.SIGNED_HEADERS,
+            self.PAYLOAD_HASH
+        )
+
+        std_request = "\n".join(request_values)
 
         # Build String-to-Sign
-        sts = "{}\n{}\n{}\n{}".format(self.ALGORITHM,
-                                      timestamp,
-                                      cred_scope,
-                                      self.compute_hash(std_request))
+        sts_values = (
+            self.ALGORITHM,
+            timestamp,
+            cred_scope,
+            self.compute_hash(std_request)
+        )
+
+        sts = "\n".join(sts_values)
 
         # Build Signature
         signature_key = self.get_signature_key(self.secret_key,
@@ -114,9 +123,10 @@ class PreSignedUrlBuilder:
                              hashlib.sha256).hexdigest()
 
         # Build the final URL
-        request_url = "{}?{}&X-Amz-Signature={}".format(self.url,
-                                                        std_qs,
-                                                        signature)
+        qs_values.append(('X-Amz-Signature', signature))
+        full_qs = urlencode(qs_values)
+
+        request_url = "{}?{}".format(self.url, full_qs)
 
         return request_url
 
@@ -154,22 +164,6 @@ class PreSignedUrlBuilder:
         msg_hash = hashlib.sha256(msg.encode('utf-8')).hexdigest()
 
         return msg_hash
-
-    @staticmethod
-    def uri_from_url(url):
-        """
-        """
-        parse = urlparse(url)
-
-        return parse.path
-
-    @staticmethod
-    def host_from_url(url):
-        """
-        """
-        parse = urlparse(url)
-
-        return parse.hostname
 
 
 def process_request_options(options):
