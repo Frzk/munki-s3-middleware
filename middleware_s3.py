@@ -1,16 +1,18 @@
 #!/usr/bin/env python
-#coding: utf8
+# coding: utf8
 
 """
-Generates a pre-signed URL, allowing anyone to download the file from an S3 bucket.
+Generates a pre-signed URL, allowing anyone to download the file from an S3
+bucket.
 
 This module is meant to plug into munki.
 https://github.com/munki/munki/wiki
 
 For explanations and a (useful) test case, see:
-See https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
+https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
 
-Some code shamelessly copied from https://github.com/waderobson/s3-auth -- Thanks.
+Some code shamelessly copied from https://github.com/waderobson/s3-auth
+Thanks !
 """
 
 import datetime
@@ -176,3 +178,4 @@ def process_request_options(options):
     options['url'] = updated_url
 
     return options
+
