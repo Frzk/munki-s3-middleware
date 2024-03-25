@@ -20,9 +20,9 @@ import hashlib
 import hmac
 
 try:  # Python3
-    from urllib.parse import (urlencode, urlparse)
+    from urllib.parse import (urlencode, urlparse, urljoin)
 except ImportError:  # Python2
-    from urlparse import urlparse
+    from urlparse import urlparse, urljoin
     from urllib import urlencode
 
 from Foundation import CFPreferencesCopyAppValue
@@ -48,16 +48,19 @@ class PreSignedUrlBuilder:
     def __init__(self, url):
         """
         """
-        self.url = url
-
         self.access_key = self.pref('S3AccessKey')
         self.secret_key = self.pref('S3SecretKey')
         self.region = self.pref('S3Region')
+        self.endpoint = self.pref('S3Endpoint')
 
-        parsed_url = urlparse(self.url)
-
+        parsed_url = urlparse(self.endpoint)
         self.host = parsed_url.hostname
+
+        parsed_url = urlparse(url)
         self.resource = parsed_url.path
+
+        # Build self.url from the S3 endpoint and path to resource:
+        self.url = urljoin(self.endpoint, self.resource)
 
     def __str__(self):
         """
@@ -171,11 +174,15 @@ class PreSignedUrlBuilder:
 def process_request_options(options):
     """
     This is the entrypoint for Munki.
-    """
-    # print("\n*** Requesting: {}".format(options.get('url')))
-    updated_url = str(PreSignedUrlBuilder(options['url']))
 
-    options['url'] = updated_url
+    We have to ignore requests to swscan.apple.com.
+    """
+    url = options.get('url')
+
+    if 'swscan.apple.com' not in url:
+        # print("\n*** Requesting: {}".format(url'))
+        updated_url = str(PreSignedUrlBuilder(url))
+        options['url'] = updated_url
 
     return options
 
